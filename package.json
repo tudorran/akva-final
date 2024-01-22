@@ -1,0 +1,69 @@
+{
+  "name": "demo-ecommerce",
+  "description": "AKVA is a Hydrogen starter that presents a real-world example of how Sanity and Structured Content can elevate your custom Shopify storefronts.",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "_dev": "turbo run dev --parallel",
+    "dev": "turbo run dev --filter=./apps/*",
+    "lint": "turbo run lint",
+    "lint:fix": "npm run lint -- -- --fix",
+    "format": "turbo run format",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.6.5",
+    "@commitlint/config-conventional": "^17.6.5",
+    "@turbo/gen": "^1.10.16",
+    "husky": "^8.0.3",
+    "turbo": "^1.10.16",
+    "vercel": "^32.5.3"
+  },
+  "packageManager": "pnpm@8.10.2",
+  "dependencies": {
+    "@sanity/block-tools": "3.19.3-pink-lizard.21",
+    "@sanity/cli": "3.19.3-pink-lizard.21",
+    "@sanity/diff": "3.19.3-pink-lizard.21",
+    "@sanity/export": "3.19.3-pink-lizard.21",
+    "@sanity/import": "3.19.3-pink-lizard.21",
+    "@sanity/import-cli": "3.19.3-pink-lizard.21",
+    "@sanity/mutator": "3.19.3-pink-lizard.21",
+    "@sanity/portable-text-editor": "3.19.3-pink-lizard.21",
+    "@sanity/schema": "3.19.3-pink-lizard.21",
+    "@sanity/types": "3.19.3-pink-lizard.21",
+    "@sanity/util": "3.19.3-pink-lizard.21",
+    "@sanity/vision": "3.19.3-pink-lizard.21",
+    "create-sanity": "3.19.3-pink-lizard.21",
+    "groq": "3.19.3-pink-lizard.21",
+    "sanity": "3.19.3-pink-lizard.21",
+    "styled-components": "6.1.1",
+    "@sanity/preview-kit": "^3.2.6",
+    "@sanity/presentation": "0.12.4-pink-lizard",
+    "@sanity/overlays": "2.3.3-pink-lizard",
+    "@sanity/react-loader": "0.10.0-pink-lizard"
+  },
+  "pnpm": {
+    "overrides": {
+      "@sanity/block-tools": "$@sanity/block-tools",
+      "@sanity/cli": "$@sanity/cli",
+      "@sanity/diff": "$@sanity/diff",
+      "@sanity/export": "$@sanity/export",
+      "@sanity/import": "$@sanity/import",
+      "@sanity/import-cli": " $@sanity/import-cli",
+      "@sanity/mutator": "$@sanity/mutator",
+      "@sanity/portable-text-editor": "$@sanity/portable-text-editor",
+      "@sanity/schema": "$@sanity/schema",
+      "@sanity/types": "$@sanity/types",
+      "@sanity/util": "$@sanity/util",
+      "@sanity/vision": "$@sanity/vision",
+      "create-sanity": "$create-sanity",
+      "groq": "$groq",
+      "sanity": "$sanity",
+      "styled-components": "$styled-components",
+      "@sanity/preview-kit": "$@sanity/preview-kit",
+      "@sanity/presentation": "$@sanity/presentation",
+      "@sanity/overlays": "$@sanity/overlays",
+      "@sanity/react-loader": "$@sanity/react-loader"
+    }
+  }
+}
