@@ -1,0 +1,204 @@
+// Virtual entry point for the app
+import { STUDIO_PATH } from "@demo-ecommerce/sanity/src/constants";
+import * as remixBuild from "@remix-run/dev/server-build";
+import { createClient as createSanityClient } from "@sanity/client/stega";
+import {
+  cartGetIdDefault,
+  cartSetIdDefault,
+  createCartHandler,
+  createStorefrontClient,
+  storefrontRedirect,
+} from "@shopify/hydrogen";
+import {
+  createCookieSessionStorage,
+  type Session,
+  type SessionStorage,
+} from "@shopify/remix-oxygen";
+import {
+  createRequestHandler,
+  getStorefrontHeaders,
+} from "@shopify/remix-oxygen";
+
+import { isStegaEnabled } from "~/lib/isStegaEnabled";
+import { createSanityProvider, stegaFilter } from "~/lib/sanity";
+import { getLocaleFromRequest } from "~/lib/utils";
+
+// TODO: setting server client should be a noop.
+declare global {
+  // eslint-disable-next-line no-var
+  var didSetClient: boolean;
+}
+globalThis.didSetClient = false;
+
+export async function handler(
+  request: Request,
+  env: Env,
+  executionContext: ExecutionContext
+): Promise<Response> {
+  try {
+    /**
+     * Open a cache instance in the worker and a custom session instance.
+     */
+    if (!env?.SESSION_SECRET) {
+      throw new Error("SESSION_SECRET environment variable is not set");
+    }
+
+    const waitUntil = (p: Promise<any>) => executionContext.waitUntil(p);
+    const secrets = [env.SESSION_SECRET];
+    // eslint-disable-next-line prefer-const
+    let [cache, session] = await Promise.all([
+      caches?.open("hydrogen"),
+      HydrogenSession.init(request, secrets),
+    ]);
+
+    // shim `Cache` when deployed in an environment that
+    // doesn't implement `CacheStorage`
+    if (cache == null) {
+      cache = {
+        add: async () => {},
+        addAll: async () => {},
+        delete: async () => true,
+        keys: async () => [],
+        match: async () => undefined,
+        matchAll: async () => [],
+        put: async () => {},
+      };
+    }
+
+    /**
+     * Create Hydrogen's Storefront client.
+     */
+    const { storefront } = createStorefrontClient({
+      cache,
+      waitUntil,
+      i18n: getLocaleFromRequest(request),
+      publicStorefrontToken: env.PUBLIC_STOREFRONT_API_TOKEN,
+      privateStorefrontToken: env.PRIVATE_STOREFRONT_API_TOKEN,
+      storeDomain: `https://${env.PUBLIC_STORE_DOMAIN}`,
+      storefrontApiVersion: env.PUBLIC_STOREFRONT_API_VERSION || "2023-10",
+      storefrontId: env.PUBLIC_STOREFRONT_ID,
+      storefrontHeaders: getStorefrontHeaders(request),
+    });
+
+    // Create a cart api instance.
+    const cart = createCartHandler({
+      storefront,
+      getCartId: cartGetIdDefault(request.headers),
+      setCartId: cartSetIdDefault(),
+    });
+
+    const stegaEnabled = isStegaEnabled(request.url);
+
+    const sanity = createSanityProvider({
+      client: createSanityClient({
+        projectId: env.SANITY_PROJECT_ID,
+        dataset: env.SANITY_DATASET || "production",
+        apiVersion: env.SANITY_API_VERSION || "2023-03-30",
+        useCdn: !stegaEnabled,
+        // resultSourceMap: "withKeyArraySelector",
+        perspective: stegaEnabled ? "previewDrafts" : "published",
+        // TODO: token for private dataset?
+        token: env.SANITY_API_TOKEN,
+        stega: {
+          // TODO: conditional based on session instead of URL
+          enabled: stegaEnabled,
+          studioUrl: STUDIO_PATH,
+          filter: stegaFilter,
+          //logger: console,
+        },
+      }),
+      waitUntil,
+      cache,
+    });
+
+    /**
+     * Create a Remix request handler and pass
+     * Hydrogen's Storefront client to the loader context.
+     */
+    const handleRequest = createRequestHandler({
+      build: remixBuild,
+      mode: process.env.NODE_ENV,
+      getLoadContext: () => ({
+        session,
+        waitUntil,
+        storefront,
+        cart,
+        env,
+        sanity,
+      }),
+    });
+
+    const response = await handleRequest(request);
+
+    if (response.status === 404) {
+      /**
+       * Check for redirects only when there's a 404 from the app.
+       * If the redirect doesn't exist, then `storefrontRedirect`
+       * will pass through the 404 response.
+       */
+      return storefrontRedirect({ request, response, storefront });
+    }
+
+    return response;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(error);
+    return new Response("An unexpected error occurred", { status: 500 });
+  }
+}
+
+/**
+ * This is a custom session implementation for your Hydrogen shop.
+ * Feel free to customize it to your needs, add helper methods, or
+ * swap out the cookie-based implementation with something else!
+ */
+export class HydrogenSession {
+  constructor(
+    private sessionStorage: SessionStorage,
+    private session: Session
+  ) {}
+
+  static async init(request: Request, secrets: string[]) {
+    const storage = createCookieSessionStorage({
+      cookie: {
+        name: "session",
+        httpOnly: true,
+        path: "/",
+        sameSite: "lax",
+        secrets,
+      },
+    });
+
+    const session = await storage.getSession(request.headers.get("Cookie"));
+
+    return new this(storage, session);
+  }
+
+  get(key: string) {
+    return this.session.get(key);
+  }
+
+  has(key: string) {
+    return this.session.has(key);
+  }
+
+  destroy() {
+    return this.sessionStorage.destroySession(this.session);
+  }
+
+  flash(key: string, value: any) {
+    this.session.flash(key, value);
+  }
+
+  unset(key: string) {
+    this.session.unset(key);
+  }
+
+  set(key: string, value: any) {
+    this.session.set(key, value);
+  }
+
+  commit() {
+    return this.sessionStorage.commitSession(this.session);
+  }
+}
